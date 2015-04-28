@@ -1,0 +1,10 @@
+#!/bin/bash
+get_sources() {
+        cd "$OPENSTACK_PATH/src"
+        [ -d $1 ] || git clone https://github.com/openstack/$1.git
+        cd $1
+        git checkout $BRANCH
+        git pull
+}
+
+# vi: ft=sh
