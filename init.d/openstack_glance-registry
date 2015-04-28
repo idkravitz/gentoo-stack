@@ -1,0 +1,13 @@
+#!/sbin/runscript
+# Copyright 1999-2015 Gentoo Foundation
+# Distributed under the terms of the GNU General Public License v2
+# $Header: $
+
+pidfile=/var/run/glance-registry.pid
+command=$OPENSTACK_PREFIX/bin/glance-registry
+required_files="${KEYSTONE_CONF:-/etc/glance/glance-registry.conf}"
+start_stop_daemon_args="--background --make-pidfile" # --user ${KEYSTONE_USER:-keystone}"
+
+depend() {
+        need mysql
+}

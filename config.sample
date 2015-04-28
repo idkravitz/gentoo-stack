@@ -1,0 +1,4 @@
+OPENSTACK_PATH="/opt/openstack"
+RELEASE="kilo"
+ADMIN_PASS="secret"
+ADMIN_EMAIL="root@localhost"

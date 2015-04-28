@@ -1,0 +1,34 @@
+#!/sbin/runscript
+# Copyright 1999-2015 Gentoo Foundation
+# Distributed under the terms of the GNU General Public License v2
+# $Header: $
+
+pidfile=/var/run/keystone.pid
+command=$OPENSTACK_PREFIX/bin/keystone-all
+required_files="${KEYSTONE_CONF:-/etc/keystone/keystone.conf}"
+start_stop_daemon_args="--background --make-pidfile" # --user ${KEYSTONE_USER:-keystone}"
+command_args="--log-file=$OPENSTACK_PREFIX/log/keystone.log"
+
+depend() {
+        need mysql
+}
+
+#start() {
+#        . /opt/openstack/bin/activate
+#        ebegin "Starting keystone service"
+#        start-stop-daemon --start --quiet --make-pidfile \
+#                --pidfile "$KEYSTONE_PIDFILE" \
+#                --exec "$OPENSTACK_BINARY" \
+#                --background \
+#                -- --log-file="$OPENSTACK_PREFIX/log/keystone.log"
+#        eend $? "Failed to start keystone"
+#}
+
+#stop() {
+#        . /opt/openstack/bin/activate
+#        ebegin "Stopping keystone service"
+#	start-stop-daemon --stop \
+#		--pidfile "$DOCKER_PIDFILE" \
+#		--exec "$OPENSTACK_BINARY"
+#        eend $? "Failed to stop keystone"
+#}
