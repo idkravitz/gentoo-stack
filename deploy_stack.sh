@@ -16,6 +16,8 @@ admin_token=$(<$SRC_PATH/.auth/admin_token)
 keystonedb_pass=$(<$SRC_PATH/.auth/keystonedb)
 glancedb_pass=$(<$SRC_PATH/.auth/glancedb)
 glance_pass=$(<$SRC_PATH/.auth/glance)
+novadb_pass=$(<$SRC_PATH/.auth/novadb)
+nova_pass=$(<$SRC_PATH/.auth/nova)
 
 service openstack_keystone start
 sleep 5
@@ -54,6 +56,8 @@ mkdir -v "$OPENSTACK_PATH/src"
 mkdir -vp "$OPENSTACK_PATH/var/lib/glance"
 mkdir -v "$OPENSTACK_PATH/var/lib/glance/images"
 mkdir -v "$OPENSTACK_PATH/var/lib/glance/image-cache"
+mkdir -vp "$OPENSTACK_PATH/var/lib/nova/state"
+mkdir -vp "$OPENSTACK_PATH/var/lock"
 
 pip install mysql
 
@@ -169,11 +173,13 @@ cp -rv $OPENSTACK_PATH/src/glance/etc/* /etc/glance
 $inifill $SRC_PATH/etc/glance-api.conf $OPENSTACK_PATH/src/glance/etc/glance-api.conf \
         | sed "s/%GLANCE_PASS%/$glance_pass/" \
         | sed "s/%GLANCE_DBPASS%/$glancedb_pass/" \
+        | sed "s!%OPENSTACK_PATH%!$OPENSTACK_PATH!" \
         > /etc/glance/glance-api.conf
 
 $inifill $SRC_PATH/etc/glance-registry.conf $OPENSTACK_PATH/src/glance/etc/glance-registry.conf \
         | sed "s/%GLANCE_PASS%/$glance_pass/" \
         | sed "s/%GLANCE_DBPASS%/$glancedb_pass/" \
+        | sed "s!%OPENSTACK_PATH%!$OPENSTACK_PATH!" \
         > /etc/glance/glance-registry.conf
 
 cp $SRC_PATH/init.d/openstack_glance-api /etc/init.d/openstack_glance-api
@@ -187,3 +193,56 @@ fi
 
 service openstack_glance-api start
 service openstack_glance-registry start
+
+get_sources nova
+pip install $OPENSTACK_PATH/src/nova
+pip install tox
+pip install "git+https://github.com/stackforge/nova-docker#egg=novadocker"
+cd $OPENSTACK_PATH/src/nova
+tox -egenconfig
+
+[ -d /etc/nova ] || mkdir /etc/nova
+cp -rv $OPENSTACK_PATH/src/nova/etc/nova/* /etc/nova
+
+novadb_pass=$(openssl rand -hex 10)
+nova_pass=$(openssl rand -hex 10)
+
+mysql <<EOF
+DROP DATABASE IF EXISTS openstack_nova;
+CREATE DATABASE openstack_nova;
+GRANT ALL PRIVILEGES ON openstack_nova.* TO 'nova'@'localhost' IDENTIFIED BY '$novadb_pass';
+FLUSH PRIVILEGES;
+EOF
+
+keystone user-create --name nova --pass $nova_pass
+keystone user-role-add --user nova --tenant service --role admin
+keystone service-create --name nova --type compute \
+          --description "OpenStack Compute"
+keystone endpoint-create \
+          --service-id $(keystone service-list | awk '/ compute / {print $2}') \
+          --publicurl http://controller:8774/v2/%\(tenant_id\)s \
+          --internalurl http://controller:8774/v2/%\(tenant_id\)s \
+          --adminurl http://controller:8774/v2/%\(tenant_id\)s \
+          --region regionOne
+
+$inifill $SRC_PATH/etc/nova.conf $OPENSTACK_PATH/src/nova/etc/nova/nova.conf.sample \
+        | sed "s/%NOVA_PASS%/$nova_pass/" \
+        | sed "s/%NOVA_DBPASS%/$novadb_pass/" \
+        | sed "s!%OPENSTACK_PATH%!$OPENSTACK_PATH!" \
+        > /etc/nova/nova.conf
+
+nova-manage db sync
+
+cp $SRC_PATH/init.d/openstack_nova /etc/init.d/openstack_nova
+echo "OPENSTACK_PREFIX=$OPENSTACK_PATH" > /etc/conf.d/openstack_nova
+echo $nova_pass > $SRC_PATH/.auth/nova
+echo $novadb_pass > $SRC_PATH/.auth/novadb
+
+cat >/etc/nova/rootwrap.d/docker.filters <<EOF
+# nova-rootwrap command filters for setting up network in the docker driver
+# This file should be owned by (and only-writeable by) the root user
+
+[Filters]
+# nova/virt/docker/driver.py: 'ln', '-sf', '/var/run/netns/.*'
+ln: CommandFilter, /bin/ln, root
+EOF

@@ -20,13 +20,26 @@ for line in fill_values:
         keyname = line.split('=')[0].rstrip()
         resline_re = re.compile('#?\s*' + keyname + '\s*=')
         result_section = None
-        # TODO adding of missing values
+        value_found = False
         for i, resline in enumerate(result_values):
             if len(resline) > 0:
                 if resline[0] == '[':
                     result_section = resline[1:-2]
                 elif fill_section == result_section and resline_re.match(resline):
                     result_values[i] = line + '\n'
+                    value_found = True
+        if not value_found:
+            insert_position = None
+            for i, resline in enumerate(result_values):
+                if len(resline) > 0:
+                    if resline[0] == '[':
+                        result_section = resline[1:-2]
+                        if fill_section == result_section:
+                            insert_position = i + 2
+            if insert_position is not None:
+                result_values.insert(insert_position, line + '\n')
+            else:
+                sys.stderr.write('SECTION {0} NOT FOUND!!!!\n'.format(fill_section))
 
 for line in result_values:
     sys.stdout.write(line)
