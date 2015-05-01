@@ -1,0 +1,41 @@
+Listen %PUBLICPORT%
+Listen %ADMINPORT%
+LogFormat "%h %l %u %t \"%r\" %>s %b \"%{Referer}i\" \"%{User-agent}i\" %D(us)" keystone_combined
+
+<VirtualHost *:%PUBLICPORT%>
+    WSGIDaemonProcess keystone-public processes=5 threads=1 user=%USER% home=%PUBLICWSGI_DIR% display-name=%{GROUP} %VIRTUALENV%
+    WSGIProcessGroup keystone-public
+    WSGIScriptAlias / %PUBLICWSGI%
+    WSGIApplicationGroup %{GLOBAL}
+    WSGIPassAuthorization On
+    <IfVersion >= 2.4>
+      ErrorLogFormat "%{cu}t %M"
+    </IfVersion>
+    <Directory %PUBLICWSGI_DIR%>
+        Require all granted
+    </Directory>
+    ErrorLog /var/log/%APACHE_NAME%/keystone.log
+    CustomLog /var/log/%APACHE_NAME%/keystone_access.log keystone_combined
+    #%SSLENGINE%
+    #%SSLCERTFILE%
+    #%SSLKEYFILE%
+</VirtualHost>
+
+<VirtualHost *:%ADMINPORT%>
+    WSGIDaemonProcess keystone-admin processes=5 threads=1 user=%USER% home=%ADMINWSGI_DIR% display-name=%{GROUP} %VIRTUALENV%
+    WSGIProcessGroup keystone-admin
+    WSGIScriptAlias / %ADMINWSGI%
+    WSGIApplicationGroup %{GLOBAL}
+    WSGIPassAuthorization On
+    <IfVersion >= 2.4>
+      ErrorLogFormat "%{cu}t %M"
+    </IfVersion>
+    <Directory %ADMINWSGI_DIR%>
+        Require all granted
+    </Directory>
+    ErrorLog /var/log/%APACHE_NAME%/keystone.log
+    CustomLog /var/log/%APACHE_NAME%/keystone_access.log keystone_combined
+    #%SSLENGINE%
+    #%SSLCERTFILE%
+    #%SSLKEYFILE%
+</VirtualHost>

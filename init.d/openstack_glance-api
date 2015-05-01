@@ -4,9 +4,9 @@
 # $Header: $
 
 pidfile=/var/run/glance-api.pid
-command=$OPENSTACK_PREFIX/bin/glance-api
+command="$OPENSTACK_PREFIX/bin/glance-api"
 required_files="${KEYSTONE_CONF:-/etc/glance/glance-api.conf}"
-start_stop_daemon_args="--background --make-pidfile" # --user ${KEYSTONE_USER:-keystone}"
+start_stop_daemon_args="--background --make-pidfile --user ${GLANCE_USER:-root}"
 
 depend() {
         need mysql
