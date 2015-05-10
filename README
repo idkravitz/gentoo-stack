@@ -1,0 +1,6 @@
+This is a very weak attempt to write something simillar to devstack,
+which would work on gentoo. At least my needs are covered, but more work
+will be done.
+
+For current version, your IP and password for RabbitMQ should be entered
+in etc/ files, since I was lasy to put it in config
