@@ -1,0 +1,14 @@
+#!/sbin/runscript
+# Copyright 1999-2015 Gentoo Foundation
+# Distributed under the terms of the GNU General Public License v2
+# $Header: $
+
+pidfile="/var/run/nova-cert.pid"
+command="${OPENSTACK_PREFIX}/bin/nova-cert"
+command_args="--config-dir ${CONFIG_DIR}"
+required_files="${CONFIG_DIR}/nova.conf"
+start_stop_daemon_args="--background --make-pidfile --user ${NOVA_USER:-root} " # --user ${KEYSTONE_USER:-keystone}"
+
+depend() {
+        need mysql
+}

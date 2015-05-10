@@ -24,6 +24,10 @@ info() {
         echo -e ${GREEN}$*${NC} 
 }
 
+warn() {
+        echo -e ${YELLOW}$*${NC}
+}
+
 gen_password() {
         openssl rand -hex 10
 }
@@ -76,10 +80,12 @@ init_environment() {
         mkdir -vp "$env_root/var/lib/nova/state" 2>/dev/null
         mkdir -vp "$env_root/var/lock" 2>/dev/null
         mkdir -vp "$env_root/var/www/keystone" 2>/dev/null
-        chown -R ${STACK_USER}:${STACK_USER} "$env_root/var/www/keystone"
-        chown -R ${STACK_USER}:${STACK_USER} "$env_root/log"
-        chown -R ${STACK_USER}:${STACK_USER} "$env_root/var/lib/glance"
-        chown -R ${STACK_USER}:${STACK_USER} "$env_root/var/lock"
+        mkdir -vp "$env_root/var/cache/nova" 2>/dev/null
+        mkdir -vp "$env_root/data" 2>/dev/null
+        #chown -R ${STACK_USER}:${STACK_USER} "$env_root/var/www/keystone"
+        #chown -R ${STACK_USER}:${STACK_USER} "$env_root/log"
+        #chown -R ${STACK_USER}:${STACK_USER} "$env_root/var/lib/glance"
+        #chown -R ${STACK_USER}:${STACK_USER} "$env_root/var/lock"
         info "Entering new environment"
         . "$env_root/bin/activate"
 }

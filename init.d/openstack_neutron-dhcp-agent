@@ -1,0 +1,14 @@
+#!/sbin/runscript
+# Copyright 1999-2015 Gentoo Foundation
+# Distributed under the terms of the GNU General Public License v2
+# $Header: $
+
+pidfile=/var/run/neutron-dhcp-agent.pid
+command="$OPENSTACK_PREFIX/bin/neutron-dhcp-agent"
+command_args="--config-file /etc/neutron/neutron.conf --config-file=/etc/neutron/dhcp_agent.ini"
+required_files="${NEUTRON_CONF:-/etc/neutron/neutron.conf}"
+start_stop_daemon_args="--background --make-pidfile --user ${NEUTRON_USER:-root}"
+
+depend() {
+        need mysql
+}

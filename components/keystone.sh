@@ -22,33 +22,37 @@ install_keystone() {
         local installed=$(verify_keystone_install "$env_path" "$admin_password")
 
         if [ "$installed" != "ok" ]; then
+                warn "Keystone seems to be not installed or improperly configured, going to fresh install"
                 obtain_keystone_sources $env_path $branch
                 pip install $env_path/src/keystone
 
                 local keystonedb_pass=$(gen_password)
                 store_auth_info "keystonedb_pass" $keystonedb_pass
 
-                mysql <<EOF
+                info "Create keystone DB"
+                $mysql <<EOF
 DROP DATABASE IF EXISTS openstack_keystone;
 CREATE DATABASE openstack_keystone;
 GRANT ALL PRIVILEGES ON openstack_keystone.* TO 'keystone'@'localhost' IDENTIFIED BY '$keystonedb_pass';
 FLUSH PRIVILEGES;
 EOF
-                [ -d /etc/keystone ] || mkdir /etc/keystone
+                [ -d /etc/keystone ] || sudo mkdir /etc/keystone
+                sudo chown -R $STACK_USER:$STACK_USER /etc/keystone
                 rm -rf /etc/keystone/*
-                install -o $STACK_USER -m 644 $env_path/src/keystone/etc/* /etc/keystone
+                cp -rv $env_path/src/keystone/etc/* /etc/keystone
 
                 $inifill ${TOP_DIR}/etc/keystone.conf $env_path/src/keystone/etc/keystone.conf.sample \
-                        | sed "s/%KEYSTONE_DBPASS%/$keystonedb_pass/" \
-                        | sed "s/%ADMIN_TOKEN%/$admin_token/" \
-                        > /etc/keystone/keystone.conf
+                        | sed -e "
+                        s|%KEYSTONE_DBPASS%|$keystonedb_pass|g;
+                        s|%ADMIN_TOKEN%|$admin_token|g;
+                        " > /etc/keystone/keystone.conf
                 local venv_path="python-path=${env_path}/lib/python2.7/site-packages"
                 local KEYSTONE_DIR=$env_path/lib/python2.7/site-packages/keystone
                 local KEYSTONE_WSGI_DIR=$env_path/var/www/keystone
                 cp $env_path/src/keystone/httpd/keystone.py $KEYSTONE_WSGI_DIR/main
                 cp $env_path/src/keystone/httpd/keystone.py $KEYSTONE_WSGI_DIR/admin
-                cat ${TOP_DIR}/etc/apache-keystone.template \
-                        | sed -e "
+                sudo cp ${TOP_DIR}/etc/apache-keystone.template /etc/apache2/vhosts.d/keystone.conf 
+                sudo sed -i -e "
                                 s|%ADMINPORT%|35357|g;
                                 s|%PUBLICPORT%|5000|g;
                                 s|%APACHE_NAME%|$APACHE_NAME|g;
@@ -58,10 +62,9 @@ EOF
                                 s|%ADMINWSGI_DIR%|$KEYSTONE_WSGI_DIR|g;
                                 s|%USER%|$STACK_USER|g;
                                 s|%VIRTUALENV%|$venv_path|g;
-                                " > /etc/apache2/vhosts.d/keystone.conf
-                chown -R ${STACK_USER}:${STACK_USER} /etc/keystone
+                                " /etc/apache2/vhosts.d/keystone.conf
                 keystone-manage db_sync
-                service apache2 restart
+                sudo /sbin/service apache2 restart
                 export OS_SERVICE_TOKEN=$admin_token
                 export OS_SERVICE_ENDPOINT=http://controller:35357/v2.0
                 keystone tenant-create --name admin --description "Admin Tenant"
@@ -91,6 +94,8 @@ EOF
 
                 local installed=$(verify_keystone_install "$env_path" "$admin_password")
                 echo $installed
+        else
+                info "Keystone is already installed"
         fi
 }
 

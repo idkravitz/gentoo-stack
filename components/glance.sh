@@ -25,13 +25,15 @@ install_glance() {
 
         local installed=$(verify_glance_install $env_path $admin_password)
         if [ "$installed" != "ok" ]; then
+                warn "Glance seems to be not installed or improperly configured, going to fresh install"
                 obtain_glance_sources $env_path $branch
                 pip install $env_path/src/glance
 
                 local glancedb_pass=$(gen_password)
                 store_auth_info 'glancedb_pass' $glancedb_pass
 
-                mysql <<EOF
+                info "Create glance db"
+                $mysql <<EOF
 DROP DATABASE IF EXISTS openstack_glance;
 CREATE DATABASE openstack_glance;
 GRANT ALL PRIVILEGES ON openstack_glance.* TO 'glance'@'localhost' IDENTIFIED BY '$glancedb_pass';
@@ -39,6 +41,9 @@ FLUSH PRIVILEGES;
 EOF
 
                 . $env_path/bin/admin-openrc.sh
+
+                keystone user-delete glance
+                keystone service-delete glance
 
                 keystone user-create --name glance --pass $glance_password
                 keystone user-role-add --user glance --tenant service --role admin
@@ -51,37 +56,47 @@ EOF
                           --adminurl http://controller:9292 \
                           --region regionOne
 
-                [ -d /etc/glance ] || mkdir /etc/glance
+                [ -d /etc/glance ] || sudo mkdir /etc/glance
+                sudo chown -R $STACK_USER:$STACK_USER /etc/glance
                 rm -rf /etc/glance/*
-                install -o $STACK_USER -m 644 $env_path/src/glance/etc/* /etc/glance
+                cp -rv $env_path/src/glance/etc/* /etc/glance
                 $inifill ${TOP_DIR}/etc/glance-api.conf $env_path/src/glance/etc/glance-api.conf \
-                        | sed "s/%GLANCE_PASS%/$glance_password/" \
-                        | sed "s/%GLANCE_DBPASS%/$glancedb_pass/" \
-                        | sed "s!%OPENSTACK_PATH%!$OPENSTACK_PATH!" \
-                        > /etc/glance/glance-api.conf
+                        | sed -e "
+                        s|%GLANCE_PASS%|$glance_password|g;
+                        s|%GLANCE_DBPASS%|$glancedb_pass|g;
+                        s|%OPENSTACK_PATH%|$OPENSTACK_PATH|g;
+                        " > /etc/glance/glance-api.conf
 
                 $inifill ${TOP_DIR}/etc/glance-registry.conf $env_path/src/glance/etc/glance-registry.conf \
-                        | sed "s/%GLANCE_PASS%/$glance_password/" \
-                        | sed "s/%GLANCE_DBPASS%/$glancedb_pass/" \
-                        | sed "s!%OPENSTACK_PATH%!$OPENSTACK_PATH!" \
-                        > /etc/glance/glance-registry.conf
+                        | sed -e "
+                        s|%GLANCE_PASS%|$glance_password|g;
+                        s|%GLANCE_DBPASS%|$glancedb_pass|g;
+                        s|%OPENSTACK_PATH%|$OPENSTACK_PATH|g;
+                        " > /etc/glance/glance-registry.conf
 
-                cp -v ${TOP_DIR}/init.d/openstack_glance-api /etc/init.d/openstack_glance-api
-                cp -v ${TOP_DIR}/init.d/openstack_glance-registry /etc/init.d/openstack_glance-registry
-                cat >/etc/conf.d/openstack_glance-api <<EOF
+                $inifill ${TOP_DIR}/etc/glance-manage.conf $env_path/src/glance/etc/glance-manage.conf \
+                        | sed -e "
+                        s|%OPENSTACK_PATH%|$OPENSTACK_PATH|g;
+                        " > /etc/glance/glance-manage.conf
+
+                sudo cp -v ${TOP_DIR}/init.d/openstack_glance-api /etc/init.d/openstack_glance-api
+                sudo cp -v ${TOP_DIR}/init.d/openstack_glance-registry /etc/init.d/openstack_glance-registry
+                sudo sh -c "cat >/etc/conf.d/openstack_glance-api <<EOF
 OPENSTACK_PREFIX=$OPENSTACK_PATH
-GLANCE_USER=openstack
+GLANCE_USER=$STACK_USER
 EOF
-                cat >/etc/conf.d/openstack_glance-registry<<EOF
+"
+                sudo sh -c "cat >/etc/conf.d/openstack_glance-registry <<EOF
 OPENSTACK_PREFIX=$OPENSTACK_PATH
-GLANCE_USER=openstack
+GLANCE_USER=$STACK_USER
 EOF
-                chown -R ${STACK_USER}:${STACK_USER} /etc/glance
+"
                 pip install python-glanceclient
                 glance-manage db_sync
 
-                service openstack_glance-api restart
-                service openstack_glance-registry restart
-
+                sudo /sbin/service openstack_glance-api restart
+                sudo /sbin/service openstack_glance-registry restart
+        else
+                info "Glance is already installed"
         fi
 }

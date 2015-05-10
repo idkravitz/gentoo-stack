@@ -1,4 +1,11 @@
+#!/bin/bash
+
 OPENSTACK_PATH="/opt/openstack"
+MYSQL_PASS="*********"
 RELEASE="kilo"
-ADMIN_PASS="secret"
-ADMIN_EMAIL="root@localhost"
+BRANCH="stable/$RELEASE"
+ADMIN_PASS="*********"
+ADMIN_EMAIL="username@server"
+STACK_USER="openstack"
+
+# vi: ft=sh
